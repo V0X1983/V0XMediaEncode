@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>13.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>V0X</Company>
+    <Product>V0X Media Encode</Product>
+    <NeutralLanguage>fr</NeutralLanguage>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+</Project>

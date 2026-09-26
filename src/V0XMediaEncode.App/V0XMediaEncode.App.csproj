@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>V0XMediaEncode.App</RootNamespace>
+    <AssemblyName>V0XMediaEncode.App</AssemblyName>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>MSIX</WindowsPackageType>
+    <Platforms>x64;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseRidGraph>true</UseRidGraph>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Phase 9: supply our own Main (Program.cs) so Velopack's startup hook runs before
+         Application.Start, instead of relying on the WinUI XAML compiler's auto-generated entry
+         point (App.g.i.cs normally emits `Program.Main` itself; this flips it to emit
+         `XamlGeneratedProgram.XamlGeneratedMain` instead, which our Program.cs calls into). -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+
+    <!-- Phase 9: MSIX signing with the local dev certificate (see scripts/New-DevCertificate.ps1).
+         Only enabled for Release so plain F5 debug builds don't need the pfx to exist.
+         PackageCertificatePassword is passed on the command line by scripts/Publish-Msix.ps1,
+         never committed here. -->
+    <AppxPackageSigningEnabled Condition="'$(Configuration)'=='Release'">true</AppxPackageSigningEnabled>
+    <PackageCertificateKeyFile Condition="'$(Configuration)'=='Release'">..\..\certs\V0XMediaEncode_DevCert.pfx</PackageCertificateKeyFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="CommunityToolkit.WinUI.Converters" Version="8.2.251219" />
+    <PackageReference Include="CommunityToolkit.WinUI.Behaviors" Version="8.2.251219" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.158" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\V0XMediaEncode.Core\V0XMediaEncode.Core.csproj" />
+    <ProjectReference Include="..\V0XMediaEncode.Services\V0XMediaEncode.Services.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

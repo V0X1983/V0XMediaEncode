@@ -1,0 +1,35 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Adobe Media Encoder-style palette: near-black chrome, cool blue accent. Applied unconditionally
+         (ElementTheme.Dark is forced on the root in MainWindow) rather than as a light/dark ThemeDictionary,
+         since the app intentionally does not follow the OS theme. -->
+
+    <Color x:Key="V0XBackgroundColor">#1E1E1E</Color>
+    <Color x:Key="V0XPanelBackgroundColor">#252526</Color>
+    <Color x:Key="V0XTitleBarBackgroundColor">#181818</Color>
+    <Color x:Key="V0XBorderColor">#3F3F3F</Color>
+    <Color x:Key="V0XAccentColor">#2D7DD2</Color>
+    <Color x:Key="V0XAccentLightColor">#4C9BE8</Color>
+    <Color x:Key="V0XTextPrimaryColor">#F0F0F0</Color>
+    <Color x:Key="V0XTextSecondaryColor">#A0A0A0</Color>
+
+    <SolidColorBrush x:Key="V0XBackgroundBrush" Color="{StaticResource V0XBackgroundColor}" />
+    <SolidColorBrush x:Key="V0XPanelBackgroundBrush" Color="{StaticResource V0XPanelBackgroundColor}" />
+    <SolidColorBrush x:Key="V0XTitleBarBackgroundBrush" Color="{StaticResource V0XTitleBarBackgroundColor}" />
+    <SolidColorBrush x:Key="V0XBorderBrush" Color="{StaticResource V0XBorderColor}" />
+    <SolidColorBrush x:Key="V0XAccentBrush" Color="{StaticResource V0XAccentColor}" />
+    <SolidColorBrush x:Key="V0XAccentLightBrush" Color="{StaticResource V0XAccentLightColor}" />
+    <SolidColorBrush x:Key="V0XTextPrimaryBrush" Color="{StaticResource V0XTextPrimaryColor}" />
+    <SolidColorBrush x:Key="V0XTextSecondaryBrush" Color="{StaticResource V0XTextSecondaryColor}" />
+
+    <!-- Re-point the framework's own theme brushes so built-in controls (NavigationView, ListView, buttons...)
+         pick up the Adobe-style palette without per-control overrides. -->
+    <SolidColorBrush x:Key="ApplicationPageBackgroundThemeBrush" Color="{StaticResource V0XBackgroundColor}" />
+    <SolidColorBrush x:Key="SystemAccentColor" Color="{StaticResource V0XAccentColor}" />
+    <SolidColorBrush x:Key="SystemAccentColorLight1" Color="{StaticResource V0XAccentLightColor}" />
+    <SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="{StaticResource V0XPanelBackgroundColor}" />
+    <SolidColorBrush x:Key="NavigationViewDefaultPaneBackground" Color="{StaticResource V0XTitleBarBackgroundColor}" />
+
+</ResourceDictionary>

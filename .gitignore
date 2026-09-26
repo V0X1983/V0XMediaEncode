@@ -1,0 +1,39 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+.vs/
+*.suo
+
+## WinUI / MSIX packaging output
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.appxsym
+*.msix
+*.msixbundle
+*.cer
+*.pfx
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Claude Code local session state
+.claude/
+
+## Crash log written to the repo root by App.LogCrash during local debugging
+crash.log
+
+## Test results
+TestResults/
+*.trx
+
+## Local app data placeholders used for dev testing
+.localappdata-dev/
+
+## Phase 9: dev signing cert secrets + Velopack release output
+certs/*.txt
+publish/
+Releases/

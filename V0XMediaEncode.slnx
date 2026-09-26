@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/V0XMediaEncode.App/V0XMediaEncode.App.csproj">
+      <Platform Project="x64" />
+    </Project>
+    <Project Path="src/V0XMediaEncode.Core/V0XMediaEncode.Core.csproj" />
+    <Project Path="src/V0XMediaEncode.Services/V0XMediaEncode.Services.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/V0XMediaEncode.Services.Tests/V0XMediaEncode.Services.Tests.csproj" />
+  </Folder>
+</Solution>

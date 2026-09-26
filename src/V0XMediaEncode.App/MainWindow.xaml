@@ -1,0 +1,61 @@
+<Window
+    x:Class="V0XMediaEncode.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Background="{StaticResource V0XBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Background="{StaticResource V0XTitleBarBackgroundBrush}">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="8">
+                <TextBlock Text="V0X Media Encode"
+                           Foreground="{StaticResource V0XTextPrimaryBrush}"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold" />
+            </StackPanel>
+        </Grid>
+
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            Background="{StaticResource V0XBackgroundBrush}"
+            PaneDisplayMode="Left"
+            IsSettingsVisible="False"
+            IsBackButtonVisible="Collapsed"
+            SelectionChanged="NavView_SelectionChanged"
+            Loaded="NavView_Loaded">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="File d'attente" Tag="Queue">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8FD;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Presets" Tag="Presets">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE713;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Dossiers surveillés" Tag="WatchFolders">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B7;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Historique" Tag="History">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Paramètres" Tag="Settings">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE9F5;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Frame x:Name="ContentFrame" />
+        </NavigationView>
+    </Grid>
+</Window>
