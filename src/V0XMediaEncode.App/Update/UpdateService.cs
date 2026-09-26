@@ -28,9 +28,10 @@ public sealed record UpdateCheckResult(UpdateCheckStatus Status, UpdateInfo? Upd
 /// </summary>
 public sealed class UpdateService
 {
-    // TODO: replace once this repo has a real GitHub remote — Velopack reads release assets
-    // (the .nupkg/.exe produced by `vpk pack`, see scripts/Publish-Velopack.ps1) from here.
-    private const string GithubRepoUrl = "https://github.com/leds83/V0XMediaEncode";
+    // Velopack reads release assets (the .nupkg/.exe produced by `vpk pack`, see
+    // scripts/Publish-Velopack.ps1) from here. Update-checking is inert until a release with those
+    // assets is published on this repo.
+    private const string GithubRepoUrl = "https://github.com/V0X1983/V0XMediaEncode";
 
     private readonly UpdateManager _updateManager;
     private readonly ILogger _logger;
