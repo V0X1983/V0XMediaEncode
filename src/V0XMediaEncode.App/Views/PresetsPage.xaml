@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:V0XMediaEncode.Core.Models"
     xmlns:converters="using:V0XMediaEncode.App.Converters"
+    xmlns:controls="using:V0XMediaEncode.App.Controls"
     Background="{StaticResource V0XBackgroundBrush}">
 
     <Page.Resources>
@@ -51,53 +52,159 @@
             <Pivot Grid.Row="1">
             <PivotItem Header="Format">
                 <StackPanel Spacing="12" Margin="0,16,0,0" MaxWidth="420" HorizontalAlignment="Left">
-                    <TextBox Header="Nom du preset" Text="{x:Bind ViewModel.SelectedPreset.Name, Mode=TwoWay}" />
-                    <ComboBox Header="Conteneur"
-                              x:Name="ContainerComboBox"
+                    <TextBox Text="{x:Bind ViewModel.SelectedPreset.Name, Mode=TwoWay}">
+                        <TextBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Nom du preset" />
+                                <controls:HelpIcon HelpText="Le nom qui identifie ce preset dans la liste, par exemple &quot;YouTube 1080p&quot;." />
+                            </StackPanel>
+                        </TextBox.Header>
+                    </TextBox>
+                    <ComboBox x:Name="ContainerComboBox"
                               ItemsSource="{x:Bind ContainerOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPreset.Container, Mode=TwoWay}" />
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset.Container, Mode=TwoWay}">
+                        <ComboBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Conteneur" />
+                                <controls:HelpIcon HelpText="Le format du fichier final (ex. MP4, MOV). Il determine quels lecteurs et quelles plateformes peuvent lire la video." />
+                            </StackPanel>
+                        </ComboBox.Header>
+                    </ComboBox>
                 </StackPanel>
             </PivotItem>
 
             <PivotItem Header="Vidéo">
                 <StackPanel Spacing="12" Margin="0,16,0,0" MaxWidth="420" HorizontalAlignment="Left">
-                    <ComboBox Header="Codec vidéo"
-                              ItemsSource="{x:Bind VideoCodecOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPreset.VideoCodec, Mode=TwoWay}" />
-                    <ComboBox Header="Accélération matérielle"
-                              ItemsSource="{x:Bind HardwareEncoderOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPreset.HardwareEncoder, Mode=TwoWay}" />
-                    <ComboBox Header="Mode de débit"
-                              ItemsSource="{x:Bind RateControlOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPreset.RateControlMode, Mode=TwoWay}" />
-                    <NumberBox Header="CRF (qualité, 0-51)" Minimum="0" Maximum="51"
-                               Value="{x:Bind ViewModel.SelectedPreset.CrfValue, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                    <NumberBox Header="Débit vidéo cible (kbps)" Minimum="0"
-                               Value="{x:Bind ViewModel.SelectedPreset.VideoBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                    <NumberBox Header="Débit vidéo max (kbps)" Minimum="0"
-                               Value="{x:Bind ViewModel.SelectedPreset.MaxVideoBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
+                    <ComboBox ItemsSource="{x:Bind VideoCodecOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset.VideoCodec, Mode=TwoWay}">
+                        <ComboBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Codec vidéo" />
+                                <controls:HelpIcon HelpText="L'algorithme de compression video utilise (ex. H.264, H.265). Il influence la compatibilite avec les lecteurs et la taille du fichier." />
+                            </StackPanel>
+                        </ComboBox.Header>
+                    </ComboBox>
+                    <StackPanel Spacing="4">
+                        <ComboBox ItemsSource="{x:Bind ViewModel.AvailableHardwareEncoders, Mode=OneWay}"
+                                  SelectedItem="{x:Bind ViewModel.SelectedPreset.HardwareEncoder, Mode=TwoWay}">
+                            <ComboBox.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Accélération matérielle" />
+                                    <controls:HelpIcon HelpText="Utilise la puce graphique (GPU) pour encoder plus vite. Seuls les GPU reellement detectes sur cette machine sont proposes ici ; choisissez &quot;None&quot; pour l'encodage logiciel (plus lent mais toujours disponible)." />
+                                </StackPanel>
+                            </ComboBox.Header>
+                        </ComboBox>
+                        <TextBlock Text="{x:Bind ViewModel.HardwareStatusText, Mode=OneWay}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource V0XTextSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox ItemsSource="{x:Bind RateControlOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset.RateControlMode, Mode=TwoWay}">
+                        <ComboBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Mode de débit" />
+                                <controls:HelpIcon HelpText="Comment le debit video est controle : CRF (qualite constante, taille variable), VBR (debit moyen cible) ou CBR (debit fixe)." />
+                            </StackPanel>
+                        </ComboBox.Header>
+                    </ComboBox>
+                    <NumberBox Minimum="0" Maximum="51"
+                               Value="{x:Bind ViewModel.SelectedPreset.CrfValue, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="CRF (qualité, 0-51)" />
+                                <controls:HelpIcon HelpText="Controle la qualite en mode CRF : plus le chiffre est bas, meilleure est la qualite (et plus le fichier est gros). 18-23 est un bon compromis pour la plupart des videos." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
+                    <NumberBox Minimum="0"
+                               Value="{x:Bind ViewModel.SelectedPreset.VideoBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Débit vidéo cible (kbps)" />
+                                <controls:HelpIcon HelpText="Le debit moyen vise pour la video, en kilobits par seconde. Plus il est eleve, meilleure est la qualite et plus le fichier est volumineux." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
+                    <NumberBox Minimum="0"
+                               Value="{x:Bind ViewModel.SelectedPreset.MaxVideoBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Débit vidéo max (kbps)" />
+                                <controls:HelpIcon HelpText="Le debit maximal autorise lors des scenes complexes, utilise avec le mode VBR." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
                     <StackPanel Orientation="Horizontal" Spacing="12">
-                        <NumberBox Header="Largeur" Width="120" Minimum="0"
-                                   Value="{x:Bind ViewModel.SelectedPreset.Width, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                        <NumberBox Header="Hauteur" Width="120" Minimum="0"
-                                   Value="{x:Bind ViewModel.SelectedPreset.Height, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                        <NumberBox Header="Images/s" Width="120" Minimum="0"
-                                   Value="{x:Bind ViewModel.SelectedPreset.FrameRate, Mode=TwoWay, Converter={StaticResource DoubleConverter}}" />
+                        <NumberBox Width="120" Minimum="0"
+                                   Value="{x:Bind ViewModel.SelectedPreset.Width, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                            <NumberBox.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Largeur" />
+                                    <controls:HelpIcon HelpText="La largeur de sortie en pixels. Laissez vide pour conserver la largeur du fichier original." />
+                                </StackPanel>
+                            </NumberBox.Header>
+                        </NumberBox>
+                        <NumberBox Width="120" Minimum="0"
+                                   Value="{x:Bind ViewModel.SelectedPreset.Height, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                            <NumberBox.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Hauteur" />
+                                    <controls:HelpIcon HelpText="La hauteur de sortie en pixels. Laissez vide pour conserver la hauteur du fichier original." />
+                                </StackPanel>
+                            </NumberBox.Header>
+                        </NumberBox>
+                        <NumberBox Width="120" Minimum="0"
+                                   Value="{x:Bind ViewModel.SelectedPreset.FrameRate, Mode=TwoWay, Converter={StaticResource DoubleConverter}}">
+                            <NumberBox.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Images/s" />
+                                    <controls:HelpIcon HelpText="Le nombre d'images par seconde de la video de sortie. Laissez vide pour conserver la cadence du fichier original." />
+                                </StackPanel>
+                            </NumberBox.Header>
+                        </NumberBox>
                     </StackPanel>
                 </StackPanel>
             </PivotItem>
 
             <PivotItem Header="Audio">
                 <StackPanel Spacing="12" Margin="0,16,0,0" MaxWidth="420" HorizontalAlignment="Left">
-                    <ComboBox Header="Codec audio"
-                              ItemsSource="{x:Bind AudioCodecOptions}"
-                              SelectedItem="{x:Bind ViewModel.SelectedPreset.AudioCodec, Mode=TwoWay}" />
-                    <NumberBox Header="Débit audio (kbps)" Minimum="0"
-                               Value="{x:Bind ViewModel.SelectedPreset.AudioBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                    <NumberBox Header="Fréquence d'échantillonnage (Hz)" Minimum="0"
-                               Value="{x:Bind ViewModel.SelectedPreset.AudioSampleRateHz, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
-                    <NumberBox Header="Canaux" Minimum="1" Maximum="8"
-                               Value="{x:Bind ViewModel.SelectedPreset.AudioChannels, Mode=TwoWay, Converter={StaticResource IntConverter}}" />
+                    <ComboBox ItemsSource="{x:Bind AudioCodecOptions}"
+                              SelectedItem="{x:Bind ViewModel.SelectedPreset.AudioCodec, Mode=TwoWay}">
+                        <ComboBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Codec audio" />
+                                <controls:HelpIcon HelpText="L'algorithme de compression audio utilise (ex. AAC, MP3). AAC est le choix le plus compatible pour du MP4." />
+                            </StackPanel>
+                        </ComboBox.Header>
+                    </ComboBox>
+                    <NumberBox Minimum="0"
+                               Value="{x:Bind ViewModel.SelectedPreset.AudioBitrateKbps, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Débit audio (kbps)" />
+                                <controls:HelpIcon HelpText="La qualite du son en kilobits par seconde. 128-192 kbps convient pour la plupart des usages." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
+                    <NumberBox Minimum="0"
+                               Value="{x:Bind ViewModel.SelectedPreset.AudioSampleRateHz, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Fréquence d'échantillonnage (Hz)" />
+                                <controls:HelpIcon HelpText="Le nombre d'echantillons audio par seconde. 48000 Hz est la norme video (qualite studio), 44100 Hz est la qualite CD." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
+                    <NumberBox Minimum="1" Maximum="8"
+                               Value="{x:Bind ViewModel.SelectedPreset.AudioChannels, Mode=TwoWay, Converter={StaticResource IntConverter}}">
+                        <NumberBox.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Canaux" />
+                                <controls:HelpIcon HelpText="Le nombre de canaux audio : 1 = mono, 2 = stereo." />
+                            </StackPanel>
+                        </NumberBox.Header>
+                    </NumberBox>
                 </StackPanel>
             </PivotItem>
             </Pivot>

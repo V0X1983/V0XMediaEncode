@@ -159,6 +159,7 @@ public static class FFmpegArgumentBuilder
         AudioCodec.Ac3 => "ac3",
         AudioCodec.Flac => "flac",
         AudioCodec.PcmS16Le => "pcm_s16le",
+        AudioCodec.Opus => "libopus",
         _ => throw new ArgumentOutOfRangeException(nameof(codec), codec, "No ffmpeg encoder mapping for this codec."),
     };
 }

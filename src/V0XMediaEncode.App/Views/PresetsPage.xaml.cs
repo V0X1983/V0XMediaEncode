@@ -14,8 +14,6 @@ public sealed partial class PresetsPage : Page
 
     public IReadOnlyList<VideoCodec> VideoCodecOptions { get; } = Enum.GetValues<VideoCodec>();
 
-    public IReadOnlyList<HardwareEncoderKind> HardwareEncoderOptions { get; } = Enum.GetValues<HardwareEncoderKind>();
-
     public IReadOnlyList<RateControlMode> RateControlOptions { get; } = Enum.GetValues<RateControlMode>();
 
     public IReadOnlyList<AudioCodec> AudioCodecOptions { get; } = Enum.GetValues<AudioCodec>();

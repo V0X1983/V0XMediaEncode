@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using V0XMediaEncode.Core.Models;
+using V0XMediaEncode.Services.Ffmpeg;
 using V0XMediaEncode.Services.Presets;
 
 namespace V0XMediaEncode.App.ViewModels;
@@ -10,21 +11,61 @@ namespace V0XMediaEncode.App.ViewModels;
 public sealed partial class PresetsViewModel : ObservableObject
 {
     private readonly IPresetRepository _presetRepository;
+    private readonly FFmpegHardwareDetectionService _hardwareDetectionService;
 
     public ObservableCollection<EncodePreset> Presets { get; } = [];
+
+    /// <summary>
+    /// Only the hardware encoder vendors this machine's ffmpeg build actually reported in
+    /// `-encoders` (see <see cref="FFmpegHardwareDetectionService"/>), plus "None" (software) which
+    /// is always available. Populated once in <see cref="InitializeAsync"/> so PresetsPage never
+    /// offers e.g. NVENC on a machine without an NVIDIA GPU.
+    /// </summary>
+    public ObservableCollection<HardwareEncoderKind> AvailableHardwareEncoders { get; } = [HardwareEncoderKind.None];
+
+    [ObservableProperty]
+    private string _hardwareStatusText = "Détection de l'accélération matérielle...";
 
     [ObservableProperty]
     private EncodePreset? _selectedPreset;
 
-    public PresetsViewModel(IPresetRepository presetRepository)
+    public PresetsViewModel(IPresetRepository presetRepository, FFmpegHardwareDetectionService hardwareDetectionService)
     {
         _presetRepository = presetRepository;
+        _hardwareDetectionService = hardwareDetectionService;
     }
 
     public async Task InitializeAsync()
     {
         await _presetRepository.InitializeAsync().ConfigureAwait(true);
         await ReloadAsync().ConfigureAwait(true);
+        await DetectHardwareAsync().ConfigureAwait(true);
+    }
+
+    private async Task DetectHardwareAsync()
+    {
+        var capabilities = await _hardwareDetectionService.DetectAsync().ConfigureAwait(true);
+
+        var detected = new List<string>();
+        if (capabilities.HasNvencH264 || capabilities.HasNvencHevc)
+        {
+            AvailableHardwareEncoders.Add(HardwareEncoderKind.Nvenc);
+            detected.Add("NVIDIA (NVENC)");
+        }
+        if (capabilities.HasQsvH264 || capabilities.HasQsvHevc)
+        {
+            AvailableHardwareEncoders.Add(HardwareEncoderKind.Qsv);
+            detected.Add("Intel (Quick Sync)");
+        }
+        if (capabilities.HasAmfH264 || capabilities.HasAmfHevc)
+        {
+            AvailableHardwareEncoders.Add(HardwareEncoderKind.Amf);
+            detected.Add("AMD (AMF)");
+        }
+
+        HardwareStatusText = detected.Count > 0
+            ? $"Accélération détectée : {string.Join(", ", detected)}."
+            : "Aucune accélération matérielle détectée sur cette machine — encodage logiciel uniquement.";
     }
 
     private async Task ReloadAsync()

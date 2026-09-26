@@ -9,4 +9,5 @@ public enum AudioCodec
     Ac3,
     Flac,
     PcmS16Le,
+    Opus,
 }

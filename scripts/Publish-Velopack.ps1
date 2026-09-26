@@ -49,6 +49,7 @@ vpk pack `
     --packVersion $Version `
     --packDir $publishDir `
     --mainExe V0XMediaEncode.App.exe `
+    --runtime win-x64 `
     --outputDir (Join-Path $repoRoot $OutputDirectory)
 
 if ($LASTEXITCODE -ne 0) {

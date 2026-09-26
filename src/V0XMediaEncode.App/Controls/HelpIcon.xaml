@@ -1,0 +1,15 @@
+<UserControl
+    x:Class="V0XMediaEncode.App.Controls.HelpIcon"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Width="16" Height="16" CornerRadius="8"
+            Background="{ThemeResource SystemControlBackgroundBaseLowBrush}"
+            BorderBrush="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+            BorderThickness="1"
+            ToolTipService.ToolTip="{x:Bind HelpText, Mode=OneWay}">
+        <TextBlock Text="?" FontSize="11" FontWeight="SemiBold"
+                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}" />
+    </Border>
+</UserControl>
