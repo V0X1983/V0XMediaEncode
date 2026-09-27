@@ -90,7 +90,7 @@
                             <ComboBox.Header>
                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                     <TextBlock Text="Accélération matérielle" />
-                                    <controls:HelpIcon HelpText="Utilise la puce graphique (GPU) pour encoder plus vite. Seuls les GPU reellement detectes sur cette machine sont proposes ici ; choisissez &quot;None&quot; pour l'encodage logiciel (plus lent mais toujours disponible)." />
+                                    <controls:HelpIcon HelpText="Utilise la puce graphique (GPU) pour encoder plus vite. &quot;Automatique&quot; choisit le meilleur GPU detecte sur cette machine (recommande). Seuls les GPU reellement detectes sont proposes en plus ; choisissez &quot;None&quot; pour forcer l'encodage logiciel (plus lent mais toujours disponible)." />
                                 </StackPanel>
                             </ComboBox.Header>
                         </ComboBox>

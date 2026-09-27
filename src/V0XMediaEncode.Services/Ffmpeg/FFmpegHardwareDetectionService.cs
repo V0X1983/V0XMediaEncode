@@ -13,7 +13,17 @@ namespace V0XMediaEncode.Services.Ffmpeg;
 /// </summary>
 public sealed class FFmpegHardwareDetectionService(IFFmpegLocator locator)
 {
-    public async Task<HardwareEncoderCapabilities> DetectAsync(CancellationToken cancellationToken = default)
+    private Task<HardwareEncoderCapabilities>? _cachedDetection;
+
+    /// <summary>
+    /// Detects once per app run and reuses the result: each probe launches a handful of ffmpeg
+    /// subprocesses, which is fine on startup but too slow to repeat before every single encode job
+    /// now that <see cref="Core.Models.HardwareEncoderKind.Automatique"/> needs this on the hot path.
+    /// </summary>
+    public Task<HardwareEncoderCapabilities> DetectAsync(CancellationToken cancellationToken = default) =>
+        _cachedDetection ??= DetectCoreAsync(cancellationToken);
+
+    private async Task<HardwareEncoderCapabilities> DetectCoreAsync(CancellationToken cancellationToken)
     {
         var compiledIn = await ParseCompiledInEncodersAsync(cancellationToken).ConfigureAwait(false);
         if (!compiledIn.HasAnyHardwareEncoder)

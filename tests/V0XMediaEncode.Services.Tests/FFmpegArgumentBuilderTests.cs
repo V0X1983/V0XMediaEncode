@@ -26,7 +26,7 @@ public class FFmpegArgumentBuilderTests
             AudioBitrateKbps = 192,
         };
 
-        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset);
+        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset, HardwareEncoderCapabilities.None);
 
         Assert.Equal(
         [
@@ -53,7 +53,7 @@ public class FFmpegArgumentBuilderTests
             AudioCodec = AudioCodec.Copy,
         };
 
-        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset);
+        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset, HardwareEncoderCapabilities.None);
 
         Assert.Contains("h264_nvenc", args);
         Assert.Contains("-maxrate", args);
@@ -73,7 +73,7 @@ public class FFmpegArgumentBuilderTests
             AudioBitrateKbps = 320,
         };
 
-        var args = FFmpegArgumentBuilder.Build(CreateJob(@"C:\out\audio.mp3"), preset);
+        var args = FFmpegArgumentBuilder.Build(CreateJob(@"C:\out\audio.mp3"), preset, HardwareEncoderCapabilities.None);
 
         Assert.Contains("-vn", args);
         Assert.DoesNotContain("-c:v", args);
@@ -91,12 +91,79 @@ public class FFmpegArgumentBuilderTests
             AudioCodec = AudioCodec.PcmS16Le,
         };
 
-        var args = FFmpegArgumentBuilder.Build(CreateJob(@"C:\out\video.mov"), preset);
+        var args = FFmpegArgumentBuilder.Build(CreateJob(@"C:\out\video.mov"), preset, HardwareEncoderCapabilities.None);
 
         Assert.Contains("prores_ks", args);
         var profileIndex = args.ToList().IndexOf("-profile:v");
         Assert.True(profileIndex >= 0);
         Assert.Equal("3", args[profileIndex + 1]);
+    }
+
+    [Fact]
+    public void Build_AutomatiqueWithDetectedNvenc_ResolvesToNvencAndUsesCqInsteadOfCrf()
+    {
+        var preset = new EncodePreset
+        {
+            Name = "auto-crf",
+            VideoCodec = VideoCodec.H265,
+            HardwareEncoder = HardwareEncoderKind.Automatique,
+            RateControlMode = RateControlMode.Crf,
+            CrfValue = 20,
+            AudioCodec = AudioCodec.Copy,
+        };
+        var capabilities = new HardwareEncoderCapabilities(
+            HasNvencH264: true, HasNvencHevc: true,
+            HasQsvH264: false, HasQsvHevc: false,
+            HasAmfH264: false, HasAmfHevc: false);
+
+        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset, capabilities);
+
+        Assert.Contains("hevc_nvenc", args);
+        Assert.DoesNotContain("-crf", args);
+        Assert.Contains("-cq", args);
+        var cqIndex = args.ToList().IndexOf("-cq");
+        Assert.Equal("20", args[cqIndex + 1]);
+    }
+
+    [Fact]
+    public void Build_AutomatiqueWithNoHardwareDetected_FallsBackToSoftwareCrf()
+    {
+        var preset = new EncodePreset
+        {
+            Name = "auto-no-hw",
+            VideoCodec = VideoCodec.H264,
+            HardwareEncoder = HardwareEncoderKind.Automatique,
+            RateControlMode = RateControlMode.Crf,
+            CrfValue = 18,
+            AudioCodec = AudioCodec.Copy,
+        };
+
+        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset, HardwareEncoderCapabilities.None);
+
+        Assert.Contains("libx264", args);
+        Assert.Contains("-crf", args);
+        Assert.Contains("18", args);
+    }
+
+    [Theory]
+    [InlineData(HardwareEncoderKind.Qsv, "-global_quality")]
+    [InlineData(HardwareEncoderKind.Amf, "-qp_i")]
+    public void Build_CrfOnExplicitHardwareEncoder_UsesVendorQualityFlag(HardwareEncoderKind hardware, string expectedFlag)
+    {
+        var preset = new EncodePreset
+        {
+            Name = "explicit-hw-crf",
+            VideoCodec = VideoCodec.H264,
+            HardwareEncoder = hardware,
+            RateControlMode = RateControlMode.Crf,
+            CrfValue = 23,
+            AudioCodec = AudioCodec.Copy,
+        };
+
+        var args = FFmpegArgumentBuilder.Build(CreateJob(), preset, HardwareEncoderCapabilities.None);
+
+        Assert.DoesNotContain("-crf", args);
+        Assert.Contains(expectedFlag, args);
     }
 
     [Theory]
@@ -108,5 +175,29 @@ public class FFmpegArgumentBuilderTests
     public void ResolveVideoEncoderName_MapsCodecAndHardware(VideoCodec codec, HardwareEncoderKind hardware, string expected)
     {
         Assert.Equal(expected, FFmpegArgumentBuilder.ResolveVideoEncoderName(codec, hardware));
+    }
+
+    [Fact]
+    public void ResolveHardwareEncoder_ExplicitChoicePassesThroughUnchanged()
+    {
+        Assert.Equal(
+            HardwareEncoderKind.None,
+            FFmpegArgumentBuilder.ResolveHardwareEncoder(HardwareEncoderKind.None, VideoCodec.H264, new HardwareEncoderCapabilities(true, true, true, true, true, true)));
+    }
+
+    [Fact]
+    public void ResolveHardwareEncoder_AutomatiquePrefersNvencThenQsvThenAmf()
+    {
+        var nvencAndQsv = new HardwareEncoderCapabilities(
+            HasNvencH264: true, HasNvencHevc: false,
+            HasQsvH264: true, HasQsvHevc: false,
+            HasAmfH264: false, HasAmfHevc: false);
+        Assert.Equal(HardwareEncoderKind.Nvenc, FFmpegArgumentBuilder.ResolveHardwareEncoder(HardwareEncoderKind.Automatique, VideoCodec.H264, nvencAndQsv));
+
+        var qsvOnly = new HardwareEncoderCapabilities(
+            HasNvencH264: false, HasNvencHevc: false,
+            HasQsvH264: true, HasQsvHevc: false,
+            HasAmfH264: false, HasAmfHevc: false);
+        Assert.Equal(HardwareEncoderKind.Qsv, FFmpegArgumentBuilder.ResolveHardwareEncoder(HardwareEncoderKind.Automatique, VideoCodec.H264, qsvOnly));
     }
 }

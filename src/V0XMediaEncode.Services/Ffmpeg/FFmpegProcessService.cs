@@ -10,7 +10,7 @@ namespace V0XMediaEncode.Services.Ffmpeg;
 /// instead of killing the process, so ffmpeg gets a chance to finalize the output file.
 /// Everything here runs off the calling (UI) thread's synchronous path via async/await.
 /// </summary>
-public sealed class FFmpegProcessService(IFFmpegLocator locator, ILogger logger)
+public sealed class FFmpegProcessService(IFFmpegLocator locator, FFmpegHardwareDetectionService hardwareDetectionService, ILogger logger)
 {
     private const int GracefulStopTimeoutMs = 5000;
     private const int ErrorTailLineCount = 40;
@@ -22,7 +22,8 @@ public sealed class FFmpegProcessService(IFFmpegLocator locator, ILogger logger)
             throw new InvalidOperationException($"Le job '{job.FileName}' n'a pas de preset assigné.");
         }
 
-        var arguments = FFmpegArgumentBuilder.Build(job, preset);
+        var capabilities = await hardwareDetectionService.DetectAsync(cancellationToken).ConfigureAwait(false);
+        var arguments = FFmpegArgumentBuilder.Build(job, preset, capabilities);
         var totalDuration = job.MediaInfo?.Duration;
 
         var startInfo = new ProcessStartInfo(locator.FFmpegPath)

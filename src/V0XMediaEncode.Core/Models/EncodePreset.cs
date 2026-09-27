@@ -17,7 +17,7 @@ public sealed class EncodePreset
     // --- Video ---
     public VideoCodec VideoCodec { get; set; } = VideoCodec.H264;
 
-    public HardwareEncoderKind HardwareEncoder { get; set; } = HardwareEncoderKind.None;
+    public HardwareEncoderKind HardwareEncoder { get; set; } = HardwareEncoderKind.Automatique;
 
     public RateControlMode RateControlMode { get; set; } = RateControlMode.Vbr;
 

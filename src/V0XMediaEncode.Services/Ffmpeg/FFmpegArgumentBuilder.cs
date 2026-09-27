@@ -10,7 +10,7 @@ namespace V0XMediaEncode.Services.Ffmpeg;
 /// </summary>
 public static class FFmpegArgumentBuilder
 {
-    public static IReadOnlyList<string> Build(EncodeJob job, EncodePreset preset)
+    public static IReadOnlyList<string> Build(EncodeJob job, EncodePreset preset, HardwareEncoderCapabilities capabilities)
     {
         var args = new List<string> { "-y", "-i", job.SourcePath };
 
@@ -25,7 +25,7 @@ public static class FFmpegArgumentBuilder
         }
         else
         {
-            AppendVideoArgs(args, preset);
+            AppendVideoArgs(args, preset, capabilities);
         }
 
         if (preset.AudioCodec == AudioCodec.None)
@@ -46,9 +46,10 @@ public static class FFmpegArgumentBuilder
         return args;
     }
 
-    private static void AppendVideoArgs(List<string> args, EncodePreset preset)
+    private static void AppendVideoArgs(List<string> args, EncodePreset preset, HardwareEncoderCapabilities capabilities)
     {
-        var encoderName = ResolveVideoEncoderName(preset.VideoCodec, preset.HardwareEncoder);
+        var resolvedHardware = ResolveHardwareEncoder(preset.HardwareEncoder, preset.VideoCodec, capabilities);
+        var encoderName = ResolveVideoEncoderName(preset.VideoCodec, resolvedHardware);
         args.Add("-c:v");
         args.Add(encoderName);
 
@@ -59,7 +60,7 @@ public static class FFmpegArgumentBuilder
         }
         else
         {
-            AppendRateControlArgs(args, preset);
+            AppendRateControlArgs(args, preset, resolvedHardware);
         }
 
         if (preset.Width is { } width && preset.Height is { } height)
@@ -75,13 +76,12 @@ public static class FFmpegArgumentBuilder
         }
     }
 
-    private static void AppendRateControlArgs(List<string> args, EncodePreset preset)
+    private static void AppendRateControlArgs(List<string> args, EncodePreset preset, HardwareEncoderKind resolvedHardware)
     {
         switch (preset.RateControlMode)
         {
             case RateControlMode.Crf when preset.CrfValue is { } crf:
-                args.Add("-crf");
-                args.Add(crf.ToString(CultureInfo.InvariantCulture));
+                AppendConstantQualityArgs(args, resolvedHardware, crf);
                 break;
 
             case RateControlMode.Cbr when preset.VideoBitrateKbps is { } cbrBitrate:
@@ -109,6 +109,76 @@ public static class FFmpegArgumentBuilder
         }
     }
 
+    /// <summary>
+    /// `-crf` is an x264/x265-only flag; NVENC/QSV/AMF reject it and use their own constant-quality
+    /// switches instead. The numeric scale isn't a perfect perceptual match across encoders, but
+    /// it's close enough on the 0-51 range that CRF presets use, and lets those presets carry over
+    /// when a preset resolves (via Auto or an explicit vendor choice) to a hardware encoder.
+    /// </summary>
+    private static void AppendConstantQualityArgs(List<string> args, HardwareEncoderKind resolvedHardware, int crf)
+    {
+        var value = crf.ToString(CultureInfo.InvariantCulture);
+
+        switch (resolvedHardware)
+        {
+            case HardwareEncoderKind.Nvenc:
+                args.Add("-rc");
+                args.Add("vbr");
+                args.Add("-cq");
+                args.Add(value);
+                args.Add("-b:v");
+                args.Add("0");
+                break;
+
+            case HardwareEncoderKind.Qsv:
+                args.Add("-global_quality");
+                args.Add(value);
+                break;
+
+            case HardwareEncoderKind.Amf:
+                args.Add("-rc");
+                args.Add("cqp");
+                args.Add("-qp_i");
+                args.Add(value);
+                args.Add("-qp_p");
+                args.Add(value);
+                args.Add("-qp_b");
+                args.Add(value);
+                break;
+
+            default:
+                args.Add("-crf");
+                args.Add(value);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Turns <see cref="HardwareEncoderKind.Automatique"/> into a concrete encoder based on what this
+    /// machine's ffmpeg actually detected (see <see cref="FFmpegHardwareDetectionService"/>),
+    /// preferring NVENC, then Quick Sync, then AMF, then falling back to software. Any other
+    /// requested kind (including an explicit <see cref="HardwareEncoderKind.None"/>) passes through
+    /// unchanged - the user picked it on purpose.
+    /// </summary>
+    public static HardwareEncoderKind ResolveHardwareEncoder(HardwareEncoderKind requested, VideoCodec codec, HardwareEncoderCapabilities capabilities)
+    {
+        if (requested != HardwareEncoderKind.Automatique)
+        {
+            return requested;
+        }
+
+        return codec switch
+        {
+            VideoCodec.H264 when capabilities.HasNvencH264 => HardwareEncoderKind.Nvenc,
+            VideoCodec.H264 when capabilities.HasQsvH264 => HardwareEncoderKind.Qsv,
+            VideoCodec.H264 when capabilities.HasAmfH264 => HardwareEncoderKind.Amf,
+            VideoCodec.H265 when capabilities.HasNvencHevc => HardwareEncoderKind.Nvenc,
+            VideoCodec.H265 when capabilities.HasQsvHevc => HardwareEncoderKind.Qsv,
+            VideoCodec.H265 when capabilities.HasAmfHevc => HardwareEncoderKind.Amf,
+            _ => HardwareEncoderKind.None,
+        };
+    }
+
     private static void AppendAudioArgs(List<string> args, EncodePreset preset)
     {
         args.Add("-c:a");
@@ -133,6 +203,11 @@ public static class FFmpegArgumentBuilder
         }
     }
 
+    /// <summary>
+    /// Expects <paramref name="hardware"/> to already be resolved (see <see cref="ResolveHardwareEncoder"/>);
+    /// an unresolved <see cref="HardwareEncoderKind.Automatique"/> falls through to the software encoder like
+    /// any other unrecognized value, which is a safe default but skips hardware acceleration.
+    /// </summary>
     public static string ResolveVideoEncoderName(VideoCodec codec, HardwareEncoderKind hardware) => (codec, hardware) switch
     {
         (VideoCodec.H264, HardwareEncoderKind.Nvenc) => "h264_nvenc",

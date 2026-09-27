@@ -49,17 +49,29 @@ public sealed class SqlitePresetRepository : IPresetRepository
             await createTable.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        await using (var countCommand = connection.CreateCommand())
+        var existingBuiltInNames = new HashSet<string>(StringComparer.Ordinal);
+        await using (var namesCommand = connection.CreateCommand())
         {
-            countCommand.CommandText = "SELECT COUNT(*) FROM Presets;";
-            var count = (long)(await countCommand.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
-            if (count == 0)
+            namesCommand.CommandText = "SELECT Name FROM Presets WHERE IsBuiltIn = 1;";
+            await using var reader = await namesCommand.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                foreach (var preset in DefaultPresets.CreateAll())
-                {
-                    await UpsertAsync(connection, preset, cancellationToken).ConfigureAwait(false);
-                }
+                existingBuiltInNames.Add(reader.GetString(0));
             }
+        }
+
+        // Seeds on first run, and on every later launch adds whichever built-in presets a newer
+        // app version introduced since this database was created - matched by Name rather than Id
+        // since DefaultPresets.CreateAll() mints a fresh Id every call. Existing rows (built-in or
+        // user-created) are left untouched either way.
+        foreach (var preset in DefaultPresets.CreateAll())
+        {
+            if (existingBuiltInNames.Contains(preset.Name))
+            {
+                continue;
+            }
+
+            await UpsertAsync(connection, preset, cancellationToken).ConfigureAwait(false);
         }
     }
 
