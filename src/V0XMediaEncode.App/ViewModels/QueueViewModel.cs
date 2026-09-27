@@ -34,6 +34,7 @@ public sealed partial class QueueViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartQueueCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelQueueCommand))]
     private bool _isEncoding;
 
     /// <summary>The job currently shown in the "Aperçu" panel (Phase 7) — not necessarily one being encoded.</summary>
@@ -213,6 +214,8 @@ public sealed partial class QueueViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
+    private bool CanCancelQueue() => IsEncoding;
+
+    [RelayCommand(CanExecute = nameof(CanCancelQueue))]
     private void CancelQueue() => _runCts?.Cancel();
 }

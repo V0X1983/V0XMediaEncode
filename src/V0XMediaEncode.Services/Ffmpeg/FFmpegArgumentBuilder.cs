@@ -106,6 +106,16 @@ public static class FFmpegArgumentBuilder
                     args.Add($"{maxBitrate * 2}k");
                 }
                 break;
+
+            // A RateControlMode whose required field (CrfValue for Crf, VideoBitrateKbps for
+            // Cbr/Vbr) is null falls through every `when` guard above. That used to silently emit no
+            // rate-control args at all - ffmpeg would then fall back to the codec's internal default
+            // quality with nothing telling the user their preset's setting was ignored. Failing fast
+            // here surfaces it as a normal job failure (EncodeQueueOrchestrator already catches and
+            // reports exceptions from Build) instead of a silent quality mismatch.
+            default:
+                throw new InvalidOperationException(
+                    $"Le preset '{preset.Name}' est en mode {preset.RateControlMode} mais n'a pas la valeur requise (CrfValue ou VideoBitrateKbps).");
         }
     }
 

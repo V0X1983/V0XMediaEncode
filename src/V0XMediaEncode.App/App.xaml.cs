@@ -46,11 +46,33 @@ public partial class App : Application
         {
             _window = new MainWindow();
             _window.Activate();
+
+            // Watch folders otherwise only start when the user navigates to the "Dossiers
+            // surveillés" page (WatchFoldersPage's constructor is what first resolves
+            // WatchFoldersViewModel and its Loaded handler calls InitializeAsync). QueuePage is the
+            // startup page, so a user who enables a folder and never visits that page in a session
+            // gets zero FileSystemWatchers running - the feature silently does nothing. Starting it
+            // here too makes watch folders actually watch from launch; WatchFoldersViewModel is a
+            // singleton and InitializeAsync is safe to run again later if the page does get opened.
+            _ = StartWatchFoldersAsync();
         }
         catch (Exception ex)
         {
             LogCrash("OnLaunched", ex);
             throw;
+        }
+    }
+
+    private static async Task StartWatchFoldersAsync()
+    {
+        try
+        {
+            var watchFoldersViewModel = Services.GetRequiredService<WatchFoldersViewModel>();
+            await watchFoldersViewModel.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error(ex, "Échec du démarrage des dossiers surveillés au lancement de l'application.");
         }
     }
 

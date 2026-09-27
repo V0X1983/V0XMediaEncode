@@ -54,10 +54,18 @@ public sealed class SqliteHistoryRepository : IHistoryRepository
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            var entry = JsonSerializer.Deserialize<HistoryEntry>(reader.GetString(0), JsonOptions);
-            if (entry is not null)
+            try
             {
-                results.Add(entry);
+                var entry = JsonSerializer.Deserialize<HistoryEntry>(reader.GetString(0), JsonOptions);
+                if (entry is not null)
+                {
+                    results.Add(entry);
+                }
+            }
+            catch (JsonException)
+            {
+                // One row with truncated/corrupted Json used to throw out of GetAllAsync entirely,
+                // losing the whole history list. Skip just that row instead.
             }
         }
 

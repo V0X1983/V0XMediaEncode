@@ -100,6 +100,21 @@ public class FFmpegArgumentBuilderTests
     }
 
     [Fact]
+    public void Build_VbrPresetMissingBitrate_ThrowsInsteadOfSilentlyOmittingRateControl()
+    {
+        var preset = new EncodePreset
+        {
+            Name = "sans-debit",
+            VideoCodec = VideoCodec.H264,
+            RateControlMode = RateControlMode.Vbr,
+            VideoBitrateKbps = null,
+            AudioCodec = AudioCodec.Copy,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => FFmpegArgumentBuilder.Build(CreateJob(), preset, HardwareEncoderCapabilities.None));
+    }
+
+    [Fact]
     public void Build_AutomatiqueWithDetectedNvenc_ResolvesToNvencAndUsesCqInsteadOfCrf()
     {
         var preset = new EncodePreset

@@ -113,7 +113,27 @@ public sealed partial class PresetsViewModel : ObservableObject
             Presets.Add(preset);
         }
 
+        EnsureAllPresetHardwareEncodersListed();
+
         SelectedPreset = selectedId is { } id ? Presets.FirstOrDefault(p => p.Id == id) : null;
+    }
+
+    /// <summary>
+    /// The "Accélération matérielle" ComboBox's SelectedItem shows blank whenever a preset's stored
+    /// HardwareEncoder isn't in AvailableHardwareEncoders - which used to happen for a preset saved
+    /// with e.g. Nvenc (by the previous app version's auto-select logic, or a manual choice) opened
+    /// either before hardware detection finishes or on a machine without that vendor's GPU at all.
+    /// Runs on every reload (not just after detection) so it also covers the pre-detection window.
+    /// </summary>
+    private void EnsureAllPresetHardwareEncodersListed()
+    {
+        foreach (var preset in Presets)
+        {
+            if (!AvailableHardwareEncoders.Contains(preset.HardwareEncoder))
+            {
+                AvailableHardwareEncoders.Add(preset.HardwareEncoder);
+            }
+        }
     }
 
     [RelayCommand]

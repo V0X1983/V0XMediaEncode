@@ -88,10 +88,19 @@ public sealed class SqlitePresetRepository : IPresetRepository
         while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var json = reader.GetString(0);
-            var preset = JsonSerializer.Deserialize<EncodePreset>(json, JsonOptions);
-            if (preset is not null)
+            try
             {
-                results.Add(preset);
+                var preset = JsonSerializer.Deserialize<EncodePreset>(json, JsonOptions);
+                if (preset is not null)
+                {
+                    results.Add(preset);
+                }
+            }
+            catch (JsonException)
+            {
+                // One row with truncated/corrupted Json (e.g. from a process killed mid-write) used
+                // to throw out of GetAllAsync entirely, losing every preset - including all built-ins
+                // - not just the bad one. Skip just that row instead.
             }
         }
 

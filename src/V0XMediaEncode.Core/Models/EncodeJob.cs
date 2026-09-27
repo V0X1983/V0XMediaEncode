@@ -40,4 +40,6 @@ public sealed partial class EncodeJob : ObservableObject
     public DateTimeOffset? CompletedAt { get; set; }
 
     public string FileName => Path.GetFileName(SourcePath);
+
+    public string OutputFileName => Path.GetFileName(OutputPath);
 }

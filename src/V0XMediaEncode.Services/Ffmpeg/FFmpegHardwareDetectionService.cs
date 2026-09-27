@@ -13,34 +13,51 @@ namespace V0XMediaEncode.Services.Ffmpeg;
 /// </summary>
 public sealed class FFmpegHardwareDetectionService(IFFmpegLocator locator)
 {
+    private readonly object _detectionLock = new();
     private Task<HardwareEncoderCapabilities>? _cachedDetection;
 
     /// <summary>
     /// Detects once per app run and reuses the result: each probe launches a handful of ffmpeg
     /// subprocesses, which is fine on startup but too slow to repeat before every single encode job
     /// now that <see cref="Core.Models.HardwareEncoderKind.Automatique"/> needs this on the hot path.
+    /// Deliberately does NOT thread <paramref name="cancellationToken"/> into the shared detection
+    /// itself: this is a one-time, app-lifetime probe shared by every caller, so one encode job being
+    /// cancelled must never cancel (and thereby permanently poison the cached result for) detection
+    /// that every other job also depends on. The lock plus the completed-unsuccessfully check below
+    /// also make this safe against two callers racing to start the first detection, and retry instead
+    /// of caching a failed attempt forever.
     /// </summary>
-    public Task<HardwareEncoderCapabilities> DetectAsync(CancellationToken cancellationToken = default) =>
-        _cachedDetection ??= DetectCoreAsync(cancellationToken);
-
-    private async Task<HardwareEncoderCapabilities> DetectCoreAsync(CancellationToken cancellationToken)
+    public Task<HardwareEncoderCapabilities> DetectAsync(CancellationToken cancellationToken = default)
     {
-        var compiledIn = await ParseCompiledInEncodersAsync(cancellationToken).ConfigureAwait(false);
+        lock (_detectionLock)
+        {
+            if (_cachedDetection is { IsCompleted: true, IsCompletedSuccessfully: false })
+            {
+                _cachedDetection = null;
+            }
+
+            return _cachedDetection ??= DetectCoreAsync();
+        }
+    }
+
+    private async Task<HardwareEncoderCapabilities> DetectCoreAsync()
+    {
+        var compiledIn = await ParseCompiledInEncodersAsync().ConfigureAwait(false);
         if (!compiledIn.HasAnyHardwareEncoder)
         {
             return HardwareEncoderCapabilities.None;
         }
 
         return new HardwareEncoderCapabilities(
-            HasNvencH264: compiledIn.HasNvencH264 && await ProbeEncoderAsync("h264_nvenc", cancellationToken).ConfigureAwait(false),
-            HasNvencHevc: compiledIn.HasNvencHevc && await ProbeEncoderAsync("hevc_nvenc", cancellationToken).ConfigureAwait(false),
-            HasQsvH264: compiledIn.HasQsvH264 && await ProbeEncoderAsync("h264_qsv", cancellationToken).ConfigureAwait(false),
-            HasQsvHevc: compiledIn.HasQsvHevc && await ProbeEncoderAsync("hevc_qsv", cancellationToken).ConfigureAwait(false),
-            HasAmfH264: compiledIn.HasAmfH264 && await ProbeEncoderAsync("h264_amf", cancellationToken).ConfigureAwait(false),
-            HasAmfHevc: compiledIn.HasAmfHevc && await ProbeEncoderAsync("hevc_amf", cancellationToken).ConfigureAwait(false));
+            HasNvencH264: compiledIn.HasNvencH264 && await ProbeEncoderAsync("h264_nvenc").ConfigureAwait(false),
+            HasNvencHevc: compiledIn.HasNvencHevc && await ProbeEncoderAsync("hevc_nvenc").ConfigureAwait(false),
+            HasQsvH264: compiledIn.HasQsvH264 && await ProbeEncoderAsync("h264_qsv").ConfigureAwait(false),
+            HasQsvHevc: compiledIn.HasQsvHevc && await ProbeEncoderAsync("hevc_qsv").ConfigureAwait(false),
+            HasAmfH264: compiledIn.HasAmfH264 && await ProbeEncoderAsync("h264_amf").ConfigureAwait(false),
+            HasAmfHevc: compiledIn.HasAmfHevc && await ProbeEncoderAsync("hevc_amf").ConfigureAwait(false));
     }
 
-    private async Task<HardwareEncoderCapabilities> ParseCompiledInEncodersAsync(CancellationToken cancellationToken)
+    private async Task<HardwareEncoderCapabilities> ParseCompiledInEncodersAsync()
     {
         var startInfo = new ProcessStartInfo(locator.FFmpegPath)
         {
@@ -57,12 +74,12 @@ public sealed class FFmpegHardwareDetectionService(IFFmpegLocator locator)
             using var process = new Process { StartInfo = startInfo };
             process.Start();
 
-            var stdout = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            var stdout = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
+            await process.WaitForExitAsync().ConfigureAwait(false);
 
             return FFmpegEncoderCapabilitiesParser.Parse(stdout);
         }
-        catch (Exception) when (cancellationToken.IsCancellationRequested is false)
+        catch (Exception)
         {
             // ffmpeg missing/unreachable: degrade to software-only encoding rather than crashing startup.
             return HardwareEncoderCapabilities.None;
@@ -75,7 +92,7 @@ public sealed class FFmpegHardwareDetectionService(IFFmpegLocator locator)
     /// rejects frame dimensions below its hardware minimum, which would otherwise register as a
     /// false negative for a GPU that works fine at real encode resolutions.
     /// </summary>
-    private async Task<bool> ProbeEncoderAsync(string encoderName, CancellationToken cancellationToken)
+    private async Task<bool> ProbeEncoderAsync(string encoderName)
     {
         var startInfo = new ProcessStartInfo(locator.FFmpegPath)
         {
@@ -101,15 +118,15 @@ public sealed class FFmpegHardwareDetectionService(IFFmpegLocator locator)
             using var process = new Process { StartInfo = startInfo };
             process.Start();
 
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync().ConfigureAwait(false);
             await stdoutTask.ConfigureAwait(false);
             await stderrTask.ConfigureAwait(false);
 
             return process.ExitCode == 0;
         }
-        catch (Exception) when (cancellationToken.IsCancellationRequested is false)
+        catch (Exception)
         {
             return false;
         }

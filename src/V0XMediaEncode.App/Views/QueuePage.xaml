@@ -9,6 +9,8 @@
 
     <Page.Resources>
         <converters:NullToVisibleConverter x:Key="NullToVisibleConverter" />
+        <converters:JobProgressDetailConverter x:Key="JobProgressDetailConverter" />
+        <converters:NotNullOrEmptyToVisibleConverter x:Key="NotNullOrEmptyToVisibleConverter" />
     </Page.Resources>
 
     <Grid Padding="20" ColumnSpacing="16">
@@ -40,40 +42,66 @@
                           SelectionChanged="JobsListView_SelectionChanged">
                     <ListView.ItemTemplate>
                         <DataTemplate x:DataType="models:EncodeJob">
-                            <Grid Padding="10" ColumnSpacing="12" Background="{StaticResource V0XPanelBackgroundBrush}" Margin="0,0,0,4" CornerRadius="4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="280" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="110" />
-                                    <ColumnDefinition Width="90" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
+                            <Grid Padding="10" RowSpacing="4" Background="{StaticResource V0XPanelBackgroundBrush}" Margin="0,0,0,4" CornerRadius="4">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding FileName}"
-                                           Foreground="{StaticResource V0XTextPrimaryBrush}"
-                                           TextTrimming="CharacterEllipsis"
-                                           VerticalAlignment="Center" />
+                                <Grid Grid.Row="0" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="280" />
+                                        <ColumnDefinition Width="140" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="190" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                <ProgressBar Grid.Column="1"
-                                             Minimum="0" Maximum="100"
-                                             Value="{Binding ProgressPercent}"
-                                             VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding FileName}"
+                                                   Foreground="{StaticResource V0XTextPrimaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding OutputFileName}"
+                                                   Foreground="{StaticResource V0XTextSecondaryBrush}"
+                                                   FontSize="11"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
 
-                                <TextBlock Grid.Column="2"
-                                           Text="{Binding Status}"
-                                           Foreground="{StaticResource V0XTextSecondaryBrush}"
-                                           VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding Preset.Name}"
+                                               Foreground="{StaticResource V0XTextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
 
-                                <TextBlock Grid.Column="3"
-                                           Text="{Binding ProgressPercent}"
-                                           Foreground="{StaticResource V0XTextSecondaryBrush}"
-                                           VerticalAlignment="Center" />
+                                    <ProgressBar Grid.Column="2"
+                                                 Minimum="0" Maximum="100"
+                                                 Value="{Binding ProgressPercent}"
+                                                 VerticalAlignment="Center" />
 
-                                <Button Grid.Column="4"
-                                        Content="Retirer"
-                                        Command="{Binding ElementName=RootPage, Path=ViewModel.RemoveJobCommand}"
-                                        CommandParameter="{Binding}" />
+                                    <TextBlock Grid.Column="3"
+                                               Text="{Binding Converter={StaticResource JobProgressDetailConverter}}"
+                                               Foreground="{StaticResource V0XTextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="4"
+                                               Text="{Binding Status}"
+                                               Foreground="{StaticResource V0XTextSecondaryBrush}"
+                                               VerticalAlignment="Center" />
+
+                                    <Button Grid.Column="5"
+                                            Content="Retirer"
+                                            Command="{Binding ElementName=RootPage, Path=ViewModel.RemoveJobCommand}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding ErrorMessage}"
+                                           Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding ErrorMessage, Converter={StaticResource NotNullOrEmptyToVisibleConverter}}" />
                             </Grid>
                         </DataTemplate>
                     </ListView.ItemTemplate>

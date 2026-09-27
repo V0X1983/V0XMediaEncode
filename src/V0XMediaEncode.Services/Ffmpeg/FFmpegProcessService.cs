@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Serilog;
 using V0XMediaEncode.Core.Models;
 
@@ -63,13 +64,19 @@ public sealed class FFmpegProcessService(IFFmpegLocator locator, FFmpegHardwareD
             }
         });
 
+        // A plain bool set by RequestGracefulStop itself (not read from cancellationToken below) so
+        // "did we actually intervene" reflects what really happened to the process rather than the
+        // token's live IsCancellationRequested flag, which can already be true by the time ffmpeg
+        // finishes on its own a moment after Cancel() was called — that race used to mislabel a
+        // successful, untouched completion as Cancelled.
+        var stopWasAttempted = new StrongBox<bool>(false);
         await using var cancellationRegistration = cancellationToken.Register(() =>
-            _ = Task.Run(() => RequestGracefulStop(process, job.FileName, logger)));
+            _ = Task.Run(() => RequestGracefulStop(process, job.FileName, stopWasAttempted, logger)));
 
         await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
         await pumpTask.ConfigureAwait(false);
 
-        var success = process.ExitCode == 0 && !cancellationToken.IsCancellationRequested;
+        var success = process.ExitCode == 0 && !stopWasAttempted.Value;
         var errorTailText = errorTail.Count > 0 ? string.Join(Environment.NewLine, errorTail) : null;
 
         if (!success)
@@ -80,7 +87,7 @@ public sealed class FFmpegProcessService(IFFmpegLocator locator, FFmpegHardwareD
         return new EncodeResult(success, process.ExitCode, errorTailText);
     }
 
-    private static void RequestGracefulStop(Process process, string fileName, ILogger logger)
+    private static void RequestGracefulStop(Process process, string fileName, StrongBox<bool> stopWasAttempted, ILogger logger)
     {
         try
         {
@@ -89,6 +96,7 @@ public sealed class FFmpegProcessService(IFFmpegLocator locator, FFmpegHardwareD
                 return;
             }
 
+            stopWasAttempted.Value = true;
             logger.Information("Annulation demandée pour {File}, envoi de 'q' à ffmpeg.", fileName);
 
             // 'q' asks ffmpeg to stop reading input and finish writing the current output file's
@@ -105,6 +113,15 @@ public sealed class FFmpegProcessService(IFFmpegLocator locator, FFmpegHardwareD
         catch (InvalidOperationException)
         {
             // Process exited between the HasExited check and the write — nothing left to stop.
+        }
+        catch (Exception ex)
+        {
+            // Kill() can throw (Win32Exception from a permission/AV lock, a race walking the process
+            // tree, ...). Previously unhandled here, this became an unobserved exception on the
+            // fire-and-forget Task.Run and left the process running with EncodeAsync's
+            // WaitForExitAsync(CancellationToken.None) awaiting it forever. Logging at least surfaces
+            // the failure; there's no further fallback to force-terminate a process that resists Kill().
+            logger.Warning(ex, "Échec de l'arrêt forcé de ffmpeg pour {File}.", fileName);
         }
     }
 }
