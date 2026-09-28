@@ -37,21 +37,22 @@ public sealed class EncodeQueueOrchestrator(FFmpegProcessService ffmpegProcessSe
         // its properties, and the queue page's data-bound ListView needs that raised on the UI
         // thread; FFmpegProcessService uses ConfigureAwait(false) throughout, so any job.* mutation
         // after awaiting it below resumes on a ThreadPool thread and must be posted back through this
-        // context - exactly what the Progress<T> below already does correctly for
-        // ProgressPercent/Eta/SpeedFactor (it captures the same context at construction time), now
-        // extended to Status/CompletedAt/ErrorMessage too. Without this, setting job.Status from that
-        // background thread threw COMException 0x8001010E (WinRT's PropertyChanged ABI wrapper
-        // rejecting a cross-apartment call) - silently leaving the job's Status stuck on whatever it
-        // last was ("Encoding") since the exception was thrown out of a plain property setter, not
-        // observed as an encode failure.
+        // context - exactly what the Progress<T> below already does for ProgressPercent/Eta/
+        // SpeedFactor (it captures the same context at construction time). Without this, setting
+        // job.Status from that background thread threw COMException 0x8001010E (WinRT's
+        // PropertyChanged ABI wrapper rejecting a cross-apartment call).
+        //
+        // Deliberately fire-and-forget (Post, not awaited): SynchronizationContext.Send isn't
+        // supported by WinUI3's DispatcherQueueSynchronizationContext (throws NotSupportedException),
+        // and awaiting a TaskCompletionSource completed from inside the posted callback risks hanging
+        // this job forever if that callback is ever dropped instead of run (e.g. window not focused/
+        // suspended) - which is exactly what silently stalled every job at 0% "Encoding" while a
+        // previous version of this fix awaited it. Job progression must never depend on the UI thread
+        // actually picking up a posted update, so every value RecordHistoryAsync below needs is
+        // tracked in local variables instead of read back from job's properties, which stay
+        // best-effort/eventually-consistent for display only.
         var uiContext = SynchronizationContext.Current;
 
-        // Send (blocking until the posted delegate runs), not Post: RecordHistoryAsync right below
-        // reads job.Status/CompletedAt/ErrorMessage immediately after RunJobAsync's try/catch/finally
-        // finishes, so the mutation must have actually committed by the time SetJobState returns -
-        // Post would just queue it and could race past RecordHistoryAsync's read. Safe to block here
-        // since this always runs on a background thread by the time it's called (past the
-        // ConfigureAwait(false) boundary above), never on the UI thread itself.
         void SetJobState(Action mutate)
         {
             if (uiContext is null)
@@ -60,74 +61,94 @@ public sealed class EncodeQueueOrchestrator(FFmpegProcessService ffmpegProcessSe
             }
             else
             {
-                uiContext.Send(_ => mutate(), null);
+                uiContext.Post(_ => mutate(), null);
             }
         }
 
         await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-        string? errorTail = null;
-        try
+
+        var startedAt = DateTimeOffset.Now;
+        SetJobState(() =>
         {
             job.Status = EncodeStatus.Encoding;
-            job.StartedAt = DateTimeOffset.Now;
+            job.StartedAt = startedAt;
             job.ErrorMessage = null;
+        });
 
-            var progress = new Progress<EncodeProgress>(p =>
+        string? errorTail = null;
+        DateTimeOffset completedAt;
+        EncodeStatus finalStatus;
+        string? finalErrorMessage = null;
+        try
+        {
+            var progress = new Progress<EncodeProgress>(p => SetJobState(() =>
             {
                 job.ProgressPercent = p.PercentComplete;
                 job.Eta = p.Eta;
                 job.SpeedFactor = p.SpeedFactor;
-            });
+            }));
 
             var result = await ffmpegProcessService.EncodeAsync(job, progress, cancellationToken).ConfigureAwait(false);
             errorTail = result.ErrorTail;
+            completedAt = DateTimeOffset.Now;
 
-            SetJobState(() =>
+            if (cancellationToken.IsCancellationRequested)
             {
-                job.CompletedAt = DateTimeOffset.Now;
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    job.Status = EncodeStatus.Cancelled;
-                }
-                else if (result.Success)
-                {
-                    job.Status = EncodeStatus.Completed;
-                    job.ProgressPercent = 100;
-                }
-                else
-                {
-                    job.Status = EncodeStatus.Failed;
-                    job.ErrorMessage = result.ErrorTail;
-                }
-            });
+                finalStatus = EncodeStatus.Cancelled;
+            }
+            else if (result.Success)
+            {
+                finalStatus = EncodeStatus.Completed;
+            }
+            else
+            {
+                finalStatus = EncodeStatus.Failed;
+                finalErrorMessage = result.ErrorTail;
+            }
         }
         catch (Exception ex)
         {
             // Deliberately catches OperationCanceledException too (no longer excluded): the
             // cooperative-cancel path above never throws - EncodeAsync returns normally and the
-            // SetJobState call above checks cancellationToken.IsCancellationRequested - so an OCE
-            // reaching here is always an unexpected failure (e.g. a shared dependency observing a
-            // stale/cancelled token), not a normal user cancel. Excluding it used to let it escape
-            // RunJobAsync entirely, skipping RecordHistoryAsync below and silently dropping that job
-            // from Historique.
+            // check above reads cancellationToken.IsCancellationRequested - so an OCE reaching here
+            // is always an unexpected failure (e.g. a shared dependency observing a stale/cancelled
+            // token), not a normal user cancel. Excluding it used to let it escape RunJobAsync
+            // entirely, skipping RecordHistoryAsync below and silently dropping that job from
+            // Historique.
             logger.Error(ex, "Échec inattendu de l'encodage pour {File}", job.FileName);
-            SetJobState(() =>
-            {
-                job.CompletedAt = DateTimeOffset.Now;
-                job.Status = EncodeStatus.Failed;
-                job.ErrorMessage = ex.Message;
-            });
+            completedAt = DateTimeOffset.Now;
+            finalStatus = EncodeStatus.Failed;
+            finalErrorMessage = ex.Message;
         }
         finally
         {
             semaphore.Release();
         }
 
-        await RecordHistoryAsync(job, errorTail).ConfigureAwait(false);
+        SetJobState(() =>
+        {
+            job.CompletedAt = completedAt;
+            job.Status = finalStatus;
+            job.ErrorMessage = finalErrorMessage;
+            job.Eta = null;
+            job.SpeedFactor = null;
+            if (finalStatus == EncodeStatus.Completed)
+            {
+                job.ProgressPercent = 100;
+            }
+        });
+
+        await RecordHistoryAsync(job, startedAt, completedAt, finalStatus, finalErrorMessage, errorTail).ConfigureAwait(false);
         onJobCompleted?.Invoke(job);
     }
 
-    private async Task RecordHistoryAsync(EncodeJob job, string? errorTail)
+    private async Task RecordHistoryAsync(
+        EncodeJob job,
+        DateTimeOffset startedAt,
+        DateTimeOffset completedAt,
+        EncodeStatus status,
+        string? errorMessage,
+        string? errorTail)
     {
         try
         {
@@ -136,10 +157,10 @@ public sealed class EncodeQueueOrchestrator(FFmpegProcessService ffmpegProcessSe
                 SourcePath = job.SourcePath,
                 OutputPath = job.OutputPath,
                 PresetName = job.Preset?.Name,
-                Status = job.Status,
-                StartedAt = job.StartedAt ?? DateTimeOffset.Now,
-                CompletedAt = job.CompletedAt ?? DateTimeOffset.Now,
-                ErrorMessage = job.ErrorMessage,
+                Status = status,
+                StartedAt = startedAt,
+                CompletedAt = completedAt,
+                ErrorMessage = errorMessage,
                 LogTail = errorTail,
             };
 

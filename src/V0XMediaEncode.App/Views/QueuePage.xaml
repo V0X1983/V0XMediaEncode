@@ -9,7 +9,9 @@
 
     <Page.Resources>
         <converters:NullToVisibleConverter x:Key="NullToVisibleConverter" />
-        <converters:JobProgressDetailConverter x:Key="JobProgressDetailConverter" />
+        <converters:PercentToTextConverter x:Key="PercentToTextConverter" />
+        <converters:SpeedFactorToTextConverter x:Key="SpeedFactorToTextConverter" />
+        <converters:EtaToTextConverter x:Key="EtaToTextConverter" />
         <converters:NotNullOrEmptyToVisibleConverter x:Key="NotNullOrEmptyToVisibleConverter" />
     </Page.Resources>
 
@@ -80,10 +82,13 @@
                                                  VerticalAlignment="Center" />
 
                                     <TextBlock Grid.Column="3"
-                                               Text="{Binding Converter={StaticResource JobProgressDetailConverter}}"
                                                Foreground="{StaticResource V0XTextSecondaryBrush}"
                                                TextTrimming="CharacterEllipsis"
-                                               VerticalAlignment="Center" />
+                                               VerticalAlignment="Center">
+                                        <Run Text="{Binding ProgressPercent, Converter={StaticResource PercentToTextConverter}}" />
+                                        <Run Text="{Binding SpeedFactor, Converter={StaticResource SpeedFactorToTextConverter}}" />
+                                        <Run Text="{Binding Eta, Converter={StaticResource EtaToTextConverter}}" />
+                                    </TextBlock>
 
                                     <TextBlock Grid.Column="4"
                                                Text="{Binding Status}"
